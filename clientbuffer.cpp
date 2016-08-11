@@ -28,6 +28,8 @@
 #error The clientbuffer module requires ZNC version 1.6.0 or later.
 #endif
 
+#define DISABLED(identifier) (CString("disabled:") + identifier)
+
 class CClientBufferMod : public CModule
 {
 public:
@@ -54,6 +56,11 @@ public:
     virtual EModRet OnPrivBufferPlayLine2(CClient& client, CString& line, const timeval& tv) override;
 
 private:
+	bool IsAutoAdd();
+	bool IsClientDisabled(const CString& identifier);
+	bool EnableClient(const CString& identifier);
+	bool DisableClient(const CString& identifier);
+
     bool AddClient(const CString& identifier);
     bool DelClient(const CString& identifier);
     bool HasClient(const CString& identifier);
@@ -78,6 +85,7 @@ void CClientBufferMod::OnAddClientCommand(const CString& line)
         return;
     }
     AddClient(identifier);
+	EnableClient(identifier);
     PutModule("Client added: " + identifier);
 }
 
@@ -93,6 +101,7 @@ void CClientBufferMod::OnDelClientCommand(const CString& line)
         return;
     }
     DelClient(identifier);
+	DisableClient(identifier);
     PutModule("Client removed: " + identifier);
 }
 
@@ -125,7 +134,7 @@ void CClientBufferMod::OnClientLogin()
 {
     const CString& current = GetClient()->GetIdentifier();
 
-    if (!HasClient(current) && GetArgs().Token(0).Equals("autoadd", CString::CaseInsensitive)) {
+    if (!HasClient(current) && IsAutoAdd() && !IsClientDisabled(current)) {
         AddClient(current);
     }
 }
@@ -228,6 +237,22 @@ bool CClientBufferMod::DelClient(const CString& identifier)
 bool CClientBufferMod::HasClient(const CString& identifier)
 {
     return !identifier.empty() && FindNV(identifier) != EndNV();
+}
+
+bool CClientBufferMod::IsAutoAdd() {
+    return GetArgs().Token(0).Equals("autoadd", CString::CaseInsensitive);
+}
+
+bool CClientBufferMod::IsClientDisabled(const CString& identifier) {
+	return FindNV(DISABLED(identifier)) != EndNV();
+}
+
+bool CClientBufferMod::DisableClient(const CString& identifier) {
+	return SetNV(DISABLED(identifier), "")
+}
+
+bool CClientBufferMod::EnableClient(const CString& identifier) {
+	return DelNV(DISABLED(identifier));
 }
 
 bool CClientBufferMod::ParseMessage(const CString& line, CNick& nick, CString& cmd, CString& target) const
